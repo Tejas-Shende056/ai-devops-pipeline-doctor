@@ -38,6 +38,7 @@ jobs:
       - name: Run AI Agent Doctor
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           FAILED_RUN_ID: ${{ github.event.workflow_run.id }}
           REPO_NAME: ${{ github.repository }}
         run: |
