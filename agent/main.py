@@ -89,26 +89,25 @@ def create_pr_node(state: AgentState) -> AgentState:
     token = state['github_token']
     repo = state['repo_name']
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json"
     }
 
     # 1. Get main branch SHA
-    main_ref = requests.get(f"https://api.github.com/repos/{repo}/git/ref/heads/main", headers=headers).json()
-    base_sha = main_ref['object']['sha']
+    ref_resp = requests.get(f"https://api.github.com/repos/{repo}/git/ref/heads/main", headers=headers)
+    if ref_resp.status_code != 200:
+        print(f"❌ Failed to fetch main branch ref: {ref_resp.status_code} {ref_resp.text}")
+        state['pr_url'] = "Failed"
+        return state
+    base_sha = ref_resp.json()['object']['sha']
 
-    # 2. Create new branch: ai-doctor-fix-<run_id>
+    # 2. Create new branch
     new_branch = f"ai-doctor-fix-{state['run_id']}"
     create_branch_res = requests.post(
         f"https://api.github.com/repos/{repo}/git/refs",
         headers=headers,
         json={"ref": f"refs/heads/{new_branch}", "sha": base_sha}
     )
-
-    if create_branch_res.status_code not in [201, 422]:
-        print(f"Failed to create branch: {create_branch_res.text}")
-        state['pr_url'] = "Failed to create PR branch"
-        return state
 
     # 3. Get existing file SHA for test_app.py
     file_info = requests.get(f"https://api.github.com/repos/{repo}/contents/test_app.py?ref={new_branch}", headers=headers).json()
@@ -142,13 +141,13 @@ def create_pr_node(state: AgentState) -> AgentState:
         }
     )
 
+    print(f"PR Creation API Response: {pr_res.status_code} - {pr_res.text}")
     if pr_res.status_code == 201:
         pr_url = pr_res.json().get('html_url')
         state['pr_url'] = pr_url
         print(f"🎉 PR Successfully Created: {pr_url}")
     else:
-        print(f"PR Creation issue: {pr_res.text}")
-        state['pr_url'] = "PR creation skipped or failed"
+        state['pr_url'] = "PR creation failed"
 
     return state
 
